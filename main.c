@@ -47,7 +47,7 @@
 /*******************************************************************************
  * Prototypes
  ******************************************************************************/
-
+void A_chord(void);
 /*******************************************************************************
  * Constant Variables
  ******************************************************************************/
@@ -72,6 +72,7 @@ volatile bool pitIsrFlag = false;
 volatile bool pit1IsrFlag = false;
 
 static uint16_t count = 0;
+static uint8_t song_count = 0;
 /*******************************************************************************
  * Handlers
  ******************************************************************************/
@@ -83,12 +84,12 @@ void PIT_DAC_HANDLER(void)
 		PIT_ClearStatusFlags(PIT, kPIT_Chnl_0, kPIT_TimerFlag);
 		pitIsrFlag = true;
 	}
-//	if(PIT_GetStatusFlags(PIT, kPIT_Chnl_1))
-//	{
-//		/* Clear interrupt flag.*/
-//		PIT_ClearStatusFlags(PIT, kPIT_Chnl_1, kPIT_TimerFlag);
-//		pit1IsrFlag = true;
-//	}
+	if(PIT_GetStatusFlags(PIT, kPIT_Chnl_1))
+	{
+		/* Clear interrupt flag.*/
+		PIT_ClearStatusFlags(PIT, kPIT_Chnl_1, kPIT_TimerFlag);
+		song_count = (count == 7) ? 0 : count + 1;
+	}
 
 	if(PIT_GetStatusFlags(PIT, kPIT_Chnl_2))
 	{
@@ -132,10 +133,10 @@ int main(void)
 
 	/* Set timer period for channel 0 */
 	PIT_SetTimerPeriod(PIT, kPIT_Chnl_0,
-			USEC_TO_COUNT(20U, PIT_SOURCE_CLOCK));
+			USEC_TO_COUNT(45U, PIT_SOURCE_CLOCK));
 
-//	PIT_SetTimerPeriod(PIT, kPIT_Chnl_1,
-//			USEC_TO_COUNT(4000000U, PIT_SOURCE_CLOCK));
+	PIT_SetTimerPeriod(PIT, kPIT_Chnl_1,
+			MSEC_TO_COUNT(5000U, PIT_SOURCE_CLOCK));
 
 	PIT_SetTimerPeriod(PIT, kPIT_Chnl_2,
 			MSEC_TO_COUNT(10U, PIT_SOURCE_CLOCK));
@@ -143,8 +144,8 @@ int main(void)
 	/* Enable timer interrupts for channel 0 */
 	PIT_EnableInterrupts(PIT, kPIT_Chnl_2, kPIT_TimerInterruptEnable);
 
-//	/* Enable timer interrupts for channel 0 */
-//	PIT_EnableInterrupts(PIT, kPIT_Chnl_1, kPIT_TimerInterruptEnable);
+	/* Enable timer interrupts for channel 0 */
+	PIT_EnableInterrupts(PIT, kPIT_Chnl_1, kPIT_TimerInterruptEnable);
 
 	/* Enable timer interrupts for channel 0 */
 	PIT_EnableInterrupts(PIT, kPIT_Chnl_0, kPIT_TimerInterruptEnable);
@@ -155,7 +156,7 @@ int main(void)
 
 	PIT_StartTimer(PIT, kPIT_Chnl_0);
 	PIT_StartTimer(PIT, kPIT_Chnl_2);
-//	PIT_StartTimer(PIT, kPIT_Chnl_1);
+	PIT_StartTimer(PIT, kPIT_Chnl_1);
 	/*******************************************************************************
 	 * SIMPLE DAC CONFIG
 	 ******************************************************************************/
@@ -179,25 +180,69 @@ int main(void)
 	/*******************************************************************************
 	 * CONV CODE
 	 ******************************************************************************/
-	uint8_t sample = 0;
-	uint16_t var;
+
 	for(;;)
     {
 
-		/* Check whether occur interupt and toggle LED */
+		/* Check whether occur interrupt and send to DAC */
 		if (true == pitIsrFlag)
 		{
 
-			var = (uint16_t)((float)(G_chord[sample]) - (((float)G_chord[sample]) * DIVISIONS * count));
+			switch (song_count) {
+			case 1:
+				A_chord();
+				break;
 
-			/* DAC value to be send */
-			DAC_SetBufferValue(DAC0, 0U, var);
-			sample = (199 == sample) ? 0 : sample + 1;
+			case 2:
+				A_chord();
+				break;
 
+			case 3:
+				A_chord();
+				break;
 
+			case 4:
+				A_chord();
+				break;
+
+			case 5:
+				A_chord();
+				break;
+
+			default:
+				A_chord();
+				break;
+			}
 
 			pitIsrFlag = 0;
 		}
 
 	}
+}
+
+
+void A_chord(void)
+{
+
+	static uint8_t first_time = 1;
+	static uint8_t number_of_sample = 0;
+	static uint16_t dac_signal;
+	if(first_time)
+	{
+		PIT_StopTimer(PIT, kPIT_Chnl_0);
+		PIT_SetTimerPeriod(PIT, kPIT_Chnl_0,
+				USEC_TO_COUNT(45U, PIT_SOURCE_CLOCK));
+		PIT_StartTimer(PIT, kPIT_Chnl_0);
+		first_time = 0;
+	}
+
+	dac_signal = (uint16_t) ((float) (G_chord[number_of_sample])
+			- (((float) G_chord[number_of_sample]) * DIVISIONS
+					* count));
+
+	/* DAC value to be send */
+	DAC_SetBufferValue(DAC0, 0U, dac_signal);
+	number_of_sample =
+			(199 == number_of_sample) ? 0 : number_of_sample + 1;
+
 }
